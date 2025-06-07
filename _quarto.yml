@@ -1,3 +1,6 @@
+site:
+  base-url: "/YRBS_Machine_Learning_Notebook/"
+
 project:
   type: website
   output-dir: docs
