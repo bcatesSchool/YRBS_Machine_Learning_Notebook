@@ -1,9 +1,9 @@
 ---
 title: "Logistic Regression"
 author: "Brileigh Cates"
-format: 
+format:
   html:
-    self-container: true
+    self-contained: true
 ---
 
 Logistic regression is a classification method used to model the probability that a binary outcome occurs, based on one or more predictor variables. Unlike linear regression, which predicts continuous values, logistic regression uses the logistic (sigmoid) function to constrain predictions between 0 and 1. It assumes a linear relationship between the predictors and the log-odds of the outcome.

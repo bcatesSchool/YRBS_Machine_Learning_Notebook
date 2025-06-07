@@ -1,8 +1,9 @@
 ---
 title: "Data and Research Question"
 author: "Brileigh Cates"
-editor_options: 
-  chunk_output_type: console
+format:
+  html:
+    self-contained: true
 ---
 
 ## Youth Risk Behavior Survey 2023

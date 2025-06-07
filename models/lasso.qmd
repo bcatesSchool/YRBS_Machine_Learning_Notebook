@@ -1,12 +1,9 @@
 ---
 title: "Lasso Regression"
 author: "Brileigh Cates"
-toc: true
 format:
   html:
-    self-container: true
-editor_options: 
-  chunk_output_type: console
+    self-contained: true
 ---
 
 Lasso regression is a statistical model that combines linear/logistic regression with L1 regularization to perform both variable selection and regularization. The term "Lasso" stands for "Least Absolute Shrinkage and Selection Operator." This method is particularly useful when dealing with datasets that have many predictors, as it helps to:
