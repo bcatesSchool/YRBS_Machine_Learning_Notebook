@@ -1,0 +1,245 @@
+---
+title: "Random Forest"
+author: "Brileigh Cates"
+format:
+  html:
+    self-contained: true
+---
+
+Random forest is an ensemble learning method that builds multiple decision trees and combines their predictions to improve accuracy and stability. Each tree is trained on a random subset of the data and features, and the final prediction is typically made by majority vote (for classification) or averaging (for regression).
+Random forest is effective because it:
+
+- Reduces overfitting compared to individual decision trees
+
+- Handles high-dimensional data and interactions between variables well
+
+- Provides measures of feature importance
+
+In this analysis, we’ll use a random forest to predict weapon-carrying behavior, leveraging its ability to handle complex, non-linear patterns and uncover influential variables that may not be obvious in simpler models.
+
+## Setting Up the Environment
+
+First, we need to load the necessary packages for our analysis. We'll use `tidymodels` for modeling, `tidyverse` for data manipulation, and `here` for consistent file paths.
+
+```{r}
+#| label: libraries
+#| include: false
+
+library(here)
+library(tidymodels)
+library(tidyverse)
+```
+
+### Loading the Data
+
+We'll work with pre-processed data sets that have been split into training and test sets, along with cross-validation folds. These files are stored in the `processed_data` directory.
+
+```{r}
+#| label: load-data
+
+analysis_data <- readRDS(here("models","data","analysis_data.rds"))
+analysis_train <- readRDS(here("models","data", "analysis_train.rds"))
+analysis_folds <- readRDS(here("models","data", "analysis_folds.rds"))
+```
+
+## Data Preprocessing
+
+Before fitting our model, we need to preprocess the data. We'll create a recipe that:
+- Imputes missing values in categorical variables using the mode
+- Imputes missing values in numeric variables using the mean
+- Creates dummy variables for categorical predictors
+
+```{r}
+#| label: data-rec
+
+weapon_carrying_forest_recipe <- 
+  recipe(formula = WeaponCarryingSchool ~ ., data = analysis_train) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_impute_mean(all_numeric_predictors()) |> 
+  step_dummy(all_nominal_predictors())
+```
+
+Let's apply our recipe to transform the data according to these preprocessing steps.
+
+```{r}
+#| label: prep
+
+weapon_carrying_forest_recipe %>% 
+  prep() %>% 
+  bake(new_data = analysis_train) 
+```
+
+## Model Specification
+
+We’ll use a random forest model, which is an ensemble of decision trees trained on different random subsets of the data and predictors. This model aggregates the predictions of many trees to improve accuracy and reduce overfitting. Key hyperparameters to be tuned include mtry (the number of predictors considered at each split) and min_n (the minimum number of observations required to split a node). Random forest also provides feature importance scores, helping us identify which variables are most influential in predicting weapon carrying.
+
+```{r}
+#| label: data-spec
+
+weapon_carrying_forest_spec <- 
+  rand_forest(
+    # the number of predictors to sample at each split
+    mtry = tune(), 
+    # the number of observations needed to keep splitting nodes
+    min_n = tune(),
+    trees = 100) |>  
+  set_mode("classification") |>  
+  set_engine("ranger", 
+             # This is essential for vip()
+             importance = "permutation") 
+
+weapon_carrying_forest_spec
+```
+
+## Creating the Workflow
+
+We'll combine our recipe and model specification into a single workflow. This ensures that all preprocessing steps are properly applied during both training and prediction.
+
+```{r}
+#| label: workflow
+
+weapon_carrying_forest_workflow <- 
+  workflow() |> 
+  add_recipe(weapon_carrying_forest_recipe) |>  
+  add_model(weapon_carrying_forest_spec) 
+
+weapon_carrying_forest_workflow
+```
+
+To identify the best hyperparameter combination for the random forest model, we'll use the tune_grid() function along with 11 automatically selected combinations. This approach allows us to efficiently explore a representative sample of the hyperparameter space without having to define a full grid manually. We'll perform cross-validation to find the best penalty value. This process is time-consuming, so we'll save the results for future use.
+
+```{r}
+#| label: tuning
+#| eval: false
+
+set.seed(46257)
+  
+weapon_carrying_forest_tune <-
+  tune_grid(
+    weapon_carrying_forest_workflow,
+    resamples = analysis_folds,
+# grid = 11 says to choose 11 parameter sets automatically 
+    grid = 11)
+
+collect_metrics(weapon_carrying_forest_tune)
+
+autoplot(weapon_carrying_forest_tune)
+
+saveRDS(weapon_carrying_forest_tune, here("models","model_outputs", "forest_tune.rds"))
+```
+
+```{r}
+#| label: tune-save
+#| echo: false
+
+weapon_carrying_forest_tune <- readRDS(here("models","model_outputs","forest_tune.rds"))
+
+collect_metrics(weapon_carrying_forest_tune)
+
+autoplot(weapon_carrying_forest_tune)
+
+
+```
+
+## Selecting the Best Model
+
+We'll select the best model based on the ROC AUC metric, which measures the model's ability to distinguish between classes.
+
+```{r}
+#| label: best-parameters
+
+best <- select_best(weapon_carrying_forest_tune, metric = "roc_auc")
+best
+```
+
+Now we'll create our final workflow with the best hyperparameters.
+
+```{r}
+#| label: data-final-wf
+
+
+final_wf <- finalize_workflow(weapon_carrying_forest_workflow, best)
+
+final_wf
+```
+
+## Fitting the Final Model
+
+We'll fit our final model on the training data. This process is also time-consuming, so we'll save the results.
+
+```{r}
+#| label: fit
+#| eval: false
+
+
+weapon_carrying_forest_fit <- fit(final_wf, analysis_train)
+
+saveRDS(weapon_carrying_forest_fit, here("models","model_outputs", "forest_fit.rds"))
+```
+
+```{r}
+#| label: fit-save
+#| echo: false
+
+weapon_carrying_forest_fit <- readRDS(here("models","model_outputs","forest_fit.rds"))
+```
+
+## Model Evaluation
+
+Let's examine the model's predictions on the training data.
+
+```{r}
+#| label: view-pred
+forest_pred <- 
+  augment(weapon_carrying_forest_fit, analysis_train) |> 
+  select(WeaponCarryingSchool, .pred_class, .pred_1, .pred_0)
+
+forest_pred
+
+```
+
+We can visualize the model's performance using an ROC curve.
+
+```{r}
+#| label: roc
+#| eval: false
+
+
+roc_forest <- 
+  forest_pred |> 
+  roc_curve(truth = WeaponCarryingSchool, 
+           .pred_1, 
+           event_level = "second") |> 
+  autoplot()
+
+roc_forest
+
+saveRDS(roc_forest, here("models","roc_graphs","forest.rds"))
+
+forest_pred |> 
+  roc_auc(truth = WeaponCarryingSchool, 
+           .pred_1, 
+           event_level = "second")
+```
+
+
+```{r}
+#echo: false
+
+roc_forest <- readRDS(here("models","roc_graphs","forest.rds"))
+
+roc_forest
+```
+
+## Cross-Validation Results
+
+We'll fit the model on each cross-validation fold to get a more robust estimate of its performance.
+
+```{r}
+#| label: folds-fit
+
+
+fit_resamples(final_wf, resamples = analysis_folds) |> 
+  collect_metrics()
+```
+

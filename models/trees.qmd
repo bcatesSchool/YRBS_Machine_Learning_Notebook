@@ -1,0 +1,276 @@
+---
+title: "Classification Tree"
+author: "Brileigh Cates"
+format:
+  html:
+    self-contained: true
+---
+
+Decision trees are intuitive, tree-structured models that split the data based on feature values to predict an outcome. Each internal node represents a decision based on a feature, and each leaf node represents a predicted class. The tree grows by recursively choosing the split that best separates the data based on criteria like information gain.
+Decision trees are valued for:
+
+- Easy interpretability — the model can be visualized and explained in plain language
+
+- Handling both numerical and categorical data
+
+- Capturing non-linear relationships without needing transformations
+
+In this analysis, we’ll use a decision tree to classify students based on whether they carry weapons to school. This approach allows us to explore simple, rule-based decision paths that might reflect real-world patterns or risk factors.
+
+## Setting Up the Environment
+
+First, we need to load the necessary packages for our analysis. We'll use `tidymodels` for modeling, `tidyverse` for data manipulation, and `here` for consistent file paths.
+
+```{r}
+#| label: libraries
+#| include: false
+
+library(here)
+library(tidymodels)
+library(tidyverse)
+```
+
+## Loading the Data
+
+We'll work with pre-processed data sets that have been split into training and test sets, along with cross-validation folds. These files are stored in the `processed_data` directory.
+
+```{r}
+#| label: load-data
+
+analysis_data <- readRDS(here("models","data","analysis_data.rds"))
+analysis_train <- readRDS(here("models","data", "analysis_train.rds"))
+analysis_folds <- readRDS(here("models","data", "analysis_folds.rds"))
+```
+
+
+## Data Preprocessing
+
+Before fitting our model, we need to preprocess the data. We'll create a recipe that:
+- Imputes missing values in categorical variables using the mode
+- Imputes missing values in numeric variables using the mean
+
+```{r}
+#| label: data-rec
+
+weapon_carrying_tree_rec <-
+  recipe(formula = WeaponCarryingSchool ~ ., data = analysis_train) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_impute_mean(all_numeric_predictors())
+
+weapon_carrying_tree_rec
+```
+
+Let's apply our recipe to transform the data according to these preprocessing steps.
+
+```{r}
+#| label: prep
+
+weapon_carrying_tree_rec %>% 
+  prep() %>% 
+  bake(new_data = analysis_train) 
+```
+
+## Model Specification
+
+We’ll use a classification decision tree to model the outcome variable. Decision trees recursively split the data into subsets based on the most informative predictor at each step, using a criterion such as information gain to guide the splits. We'll tune key hyperparameters such as cost_complexity (which controls pruning) and tree_depth (which limits the depth of the tree) to prevent overfitting and improve generalization. The goal is to produce a tree that is both accurate and interpretable.
+
+```{r}
+#| label: data-spec
+
+weapon_carrying_tree_spec <- 
+  decision_tree(
+   cost_complexity = tune(),
+   tree_depth = tune(),
+   min_n = tune()) |>  
+  set_engine("rpart") |> 
+  set_mode("classification")
+
+weapon_carrying_tree_spec 
+```
+
+## Creating the Workflow
+
+We'll combine our recipe and model specification into a single workflow. This ensures that all preprocessing steps are properly applied during both training and prediction.
+
+```{r}
+#| label: data-wf
+
+weapon_carrying_tree_wf <- 
+  workflow() |> 
+  add_recipe(weapon_carrying_tree_rec) |> 
+  add_model(weapon_carrying_tree_spec)
+
+weapon_carrying_tree_wf
+```
+
+To find the optimal decision tree parameters, we’ll define a regular grid across several key hyperparameters (cost_complexity, tree_depth, min_n). We'll use a regular grid with 4 levels for each parameter, exploring combinations within the specified ranges.
+```{r}
+#| label: tuning
+
+tree_grid <- 
+  grid_regular(cost_complexity(),
+               tree_depth(c(2, 5)),
+               min_n(), 
+               levels = 4)
+tree_grid
+```
+
+Now, we'll perform cross-validation to find the best penalty value. This process is time-consuming, so we'll save the results for future use.
+
+```{r}
+#| label: tuning-pt2
+#| eval: false
+
+weapon_carrying_tree_tune <- 
+  weapon_carrying_tree_wf %>% 
+  tune_grid(resamples = analysis_folds,
+            grid = tree_grid, 
+            metrics = metric_set(roc_auc),
+            control = control_grid(save_pred = TRUE)
+  )
+
+saveRDS(weapon_carrying_tree_tune, here("models","model_outputs", "tree_tune.rds"))
+```
+
+
+```{r}
+#| label: bring-in-tuning
+#| echo: false
+
+weapon_carrying_tree_tune <- readRDS(here("models","model_outputs","tree_tune.rds"))
+```
+
+## Selecting the Best Model
+
+We'll select the best model based on the ROC AUC metric, which measures the model's ability to distinguish between classes.
+
+```{r}
+#| label: best
+
+show_best(weapon_carrying_tree_tune, metric = "roc_auc")
+```
+
+## Plotting the Hyperparameters
+
+```{r}
+#| label: plot
+
+
+bestPlot_weapon_carrying_tree <- 
+  autoplot(weapon_carrying_tree_tune)
+
+bestPlot_weapon_carrying_tree
+```
+
+```{r}
+#| label: choosing
+
+best_weapon_carrying_tree <- select_best(
+  weapon_carrying_tree_tune, 
+  metric = "roc_auc")
+
+best_weapon_carrying_tree
+```
+
+Now we'll create our final workflow with the best hyperparameters.
+
+```{r}
+#| label: final-wf
+weapon_carrying_tree_final_wf <- finalize_workflow(weapon_carrying_tree_wf, best_weapon_carrying_tree)
+weapon_carrying_tree_final_wf
+```
+
+## Fitting the Final Model
+
+We'll fit our final model on the training data. This process is also time-consuming, so we'll save the results.
+
+```{r}
+#| label: fit
+#| eval: false
+
+weapon_carrying_tree_fit <- fit(
+  weapon_carrying_tree_final_wf, 
+  analysis_train)
+
+weapon_carrying_tree_fit
+
+saveRDS(weapon_carrying_tree_fit, here("models","model_outputs", "tree_fit.rds"))
+```
+
+
+```{r}
+#| label: fit-save
+#| echo: false
+
+weapon_carrying_tree_fit <- readRDS(here("models","model_outputs","tree_fit.rds"))
+```
+
+## Model Evaluation
+
+Let's examine the model's predictions on the training data.
+
+```{r}
+#| label: view-pred
+tree_pred <- 
+  augment(weapon_carrying_tree_fit, analysis_train) |> 
+  select(WeaponCarryingSchool, .pred_class, .pred_1, .pred_0)
+
+tree_pred
+```
+
+
+We can visualize the model's performance using an ROC curve.
+
+```{r}
+#| label: roc
+#| eval: false
+
+
+roc_tree <- 
+  tree_pred |> 
+  roc_curve(truth = WeaponCarryingSchool, 
+           .pred_1, 
+           event_level = "second") |> 
+  autoplot()
+
+roc_tree
+
+saveRDS(roc_tree, here("models","roc_graphs","tree.rds"))
+
+tree_pred |> 
+  roc_auc(truth = WeaponCarryingSchool, 
+           .pred_1, 
+           event_level = "second")
+```
+
+```{r}
+#| echo: false
+
+roc_tree <- readRDS(here("models","roc_graphs","tree.rds"))
+roc_tree
+```
+
+## Cross-Validation Results
+
+We'll fit the model on each cross-validation fold to get a more robust estimate of its performance.
+
+```{r}
+#| label: folds-fit
+
+
+fit_resamples(weapon_carrying_tree_final_wf, resamples = analysis_folds) |> 
+  collect_metrics()
+```
+
+## Tree Graph
+
+Finally, let's create a graphical representation of the tree.
+
+```{r}
+#| label: tree
+
+
+weapon_carrying_tree_fit |> 
+  extract_fit_engine() |> 
+  rpart.plot::rpart.plot(roundint=FALSE)
+```

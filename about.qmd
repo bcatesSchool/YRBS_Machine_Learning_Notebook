@@ -1,0 +1,22 @@
+---
+title: "About Me"
+---
+
+::: {.profile-container}
+::: {.profile-image}
+![](img/Screenshot 2025-06-05 120230.png){.circle-image}
+:::
+
+::: {.profile-text}
+### I am Brileigh Cates
+
+
+I am a first year `Master's Student` and `Graduate Teaching Assistant` at Missouri University of Science and Technology studying statistics, researching functional connectivity and sleep states. With previous work in studying the gender bias in the music industry and work yet to come, I believe that the use of multiple interdisciplinary fields allows researchers to truly understand the different hypotheses and how to answer each question.
+
+In this website, I investigated and learned different `machine learning` techniques and models to reveal patterns and insights in violent behaviors in young students, specifically by using suicide-related data. As an R user, I am committed to sharing my knowledge, skills, and experiences with the broader community to expand resources for all researchers.
+
+I am also dedicated to ensuring clarity and reproducibility in my work, using tools like `Quarto` and `RMarkdown`. This approach ensures that my research is trustworthy and easily followed by others.
+
+If I could describe myself using three emojis I would select: 🐈 🎷 🎲
+:::
+:::

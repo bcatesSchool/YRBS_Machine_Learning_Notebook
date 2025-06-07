@@ -1,0 +1,165 @@
+---
+title: "Logistic Regression"
+author: "Brileigh Cates"
+format: 
+  html:
+    self-container: true
+---
+
+Logistic regression is a classification method used to model the probability that a binary outcome occurs, based on one or more predictor variables. Unlike linear regression, which predicts continuous values, logistic regression uses the logistic (sigmoid) function to constrain predictions between 0 and 1. It assumes a linear relationship between the predictors and the log-odds of the outcome.
+Logistic regression is widely used because it:
+
+- Produces interpretable coefficients that indicate the direction and strength of association
+
+- Works well with smaller datasets and fewer predictors
+
+- Allows for statistical testing of individual variables’ significance
+
+In this analysis, we'll use logistic regression to predict whether a student is likely to carry a weapon to school, helping us understand how factors such as prior behavior, peer influence, and school climate relate to the outcome.
+
+## Setting Up the Environment
+
+First, we need to load the necessary packages for our analysis. We'll use `tidymodels` for modeling, `tidyverse` for data manipulation, and `here` for consistent file paths.
+```{r}
+#| label: implementation
+#| include: false
+library(here)
+library(tidymodels)
+library(tidyverse)
+```
+
+
+### Loading the Data
+
+We'll work with pre-processed data sets that have been split into training and test sets, along with cross-validation folds. These files are stored in the `processed_data` directory.
+
+```{r}
+#| label: load-data
+#| output: false
+analysis_data <- readRDS(here("models","data","analysis_data.rds"))
+analysis_train <- readRDS(here("models","data","analysis_train.rds"))
+```
+
+## Data Preprocessing
+
+Before fitting our model, we need to preprocess the data. We'll create a recipe that:
+- Imputes missing values in categorical variables using the mode
+- Imputes missing values in numeric variables using the mean
+- Removes predictors with zero variance
+- Removes highly correlated predictors (correlation threshold = 0.7)
+
+```{r}
+#| label: model-recipe
+weapon_carry_recipe <-
+  recipe(formula = WeaponCarryingSchool ~ ., data = analysis_data) %>% 
+  step_impute_mode(all_nominal_predictors()) %>% 
+  step_impute_mean(all_numeric_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_corr(all_numeric_predictors(), threshold = 0.7)
+
+weapon_carry_recipe
+```
+
+Let's apply our recipe to transform the data according to these preprocessing steps.
+
+```{r}
+#| label: model-bake
+rec <- weapon_carry_recipe %>% 
+  prep() %>% 
+  bake(new_data = analysis_data) %>% 
+  glimpse()
+```
+
+## Model Specification
+
+We’ll use a standard logistic regression model to predict a binary outcome. Logistic regression models the log-odds of the outcome as a linear combination of the predictors. It does not include any form of regularization by default, so all predictors are retained unless manually excluded. This makes it a good baseline model for interpreting how individual features relate to the outcome. We'll include all relevant predictors and assess their individual contributions to the likelihood of weapon carrying.
+
+```{r}
+#| label: model-spec
+weapon_carry_spec <-
+  logistic_reg() %>% 
+  set_mode("classification") %>% 
+  set_engine("glm")
+
+weapon_carry_spec
+```
+
+## Creating the Workflow
+
+We'll combine our recipe and model specification into a single workflow. This ensures that all preprocessing steps are properly applied during both training and prediction.
+
+```{r}
+#| label: model-workflow
+
+weapon_carry_workflow <- workflow() %>% 
+  add_recipe(weapon_carry_recipe) %>% 
+  add_model(weapon_carry_spec)
+
+weapon_carry_workflow
+```
+
+## Fitting the Final Model
+
+We'll fit our final model on the training data. This process is also time-consuming, so we'll save the results.
+
+```{r}
+#| label: model-fit
+mod1 <- 
+  fit(weapon_carry_workflow, data = analysis_train)
+
+mod1
+
+saveRDS(mod1, here("models","model_outputs","logistic_fit.rds"))
+```
+
+```{r}
+#| label: model-tidy
+tidy_model <-
+  mod1 %>% 
+  tidy(exponentiate = TRUE,
+       conf.int = TRUE,
+       conf.level = 0.95) %>% 
+  mutate(p.value = scales::pvalue(p.value))
+
+tidy_model
+
+saveRDS(tidy_model, here("models","model_outputs", "logistic_tidy_fit.rds"))
+```
+
+
+## Model Evaluation
+
+Let's examine the model's predictions on the training data.
+
+```{r}
+#| label: model-eval
+weapon_pred_logistic <-
+  augment(mod1, analysis_train) %>% 
+  select(WeaponCarryingSchool, .pred_class, .pred_1, .pred_0)
+
+weapon_pred_logistic
+```
+
+We can visualize the model's performance using a confusion matrix.
+
+```{r}
+weapon_pred_logistic %>% 
+  conf_mat(WeaponCarryingSchool, .pred_class) %>% 
+  autoplot(type = "heatmap")
+```
+
+We can visualize the model's performance using an ROC curve.
+
+```{r}
+#| label: roc
+roc_plot_logistic <-
+  weapon_pred_logistic %>% 
+  roc_curve(truth = WeaponCarryingSchool, .pred_1, event_level = "second") %>% 
+  autoplot()
+
+
+saveRDS(roc_plot_logistic, here("models","roc_graphs", "logistic.rds"))
+
+roc_plot_logistic
+```
+
