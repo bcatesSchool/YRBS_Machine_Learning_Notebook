@@ -9,21 +9,21 @@ website:
   title: "Machine Learning Notes"
   navbar:
     left:
-      - href: index.qmd
+      - href: index.html
         text: Home
-      - href: about.qmd
+      - href: about.html
         text: About
       - text: Models
         menu:
-          - href: models/datasets.qmd
+          - href: models/datasets.html
             text: Data and Research Question
-          - href: models/logistic.qmd
+          - href: models/logistic.html
             text: Logistic Regression
-          - href: models/lasso.qmd
+          - href: models/lasso.html
             text: Lasso Regression
-          - href: models/trees.qmd
+          - href: models/trees.html
             text: Decision Trees
-          - href: models/random-forest.qmd
+          - href: models/random-forest.html
             text: Random Forest
 
 format:
