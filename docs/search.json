@@ -305,6 +305,6 @@
     "href": "models/random-forest.html#cross-validation-results",
     "title": "Random Forest",
     "section": "Cross-Validation Results",
-    "text": "Cross-Validation Results\nWe’ll fit the model on each cross-validation fold to get a more robust estimate of its performance.\n\nfit_resamples(final_wf, resamples = analysis_folds) |&gt; \n  collect_metrics()\n\nWarning: package 'ranger' was built under R version 4.3.3\n\n\n# A tibble: 3 × 6\n  .metric     .estimator   mean     n std_err .config             \n  &lt;chr&gt;       &lt;chr&gt;       &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;               \n1 accuracy    binary     0.957      5 0.00142 Preprocessor1_Model1\n2 brier_class binary     0.0402     5 0.00125 Preprocessor1_Model1\n3 roc_auc     binary     0.682      5 0.00944 Preprocessor1_Model1"
+    "text": "Cross-Validation Results\nWe’ll fit the model on each cross-validation fold to get a more robust estimate of its performance.\n\nfit_resamples(final_wf, resamples = analysis_folds) |&gt; \n  collect_metrics()\n\nWarning: package 'ranger' was built under R version 4.3.3\n\n\n# A tibble: 3 × 6\n  .metric     .estimator   mean     n std_err .config             \n  &lt;chr&gt;       &lt;chr&gt;       &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;               \n1 accuracy    binary     0.957      5 0.00142 Preprocessor1_Model1\n2 brier_class binary     0.0402     5 0.00126 Preprocessor1_Model1\n3 roc_auc     binary     0.684      5 0.0103  Preprocessor1_Model1"
   }
 ]
