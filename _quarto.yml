@@ -1,5 +1,6 @@
 project:
   type: website
+  base-url: "/YRBS_Machine_Learning_Notebook/"
   output-dir: docs
   resources:
     - R/
