@@ -1,8 +1,5 @@
 ---
 title: "Machine Learning Notebook 👀"
-format:
-  html:
-  self-contained: true
 ---
 
 This website is a short notebook from a Machine Learning course taken in June of 2025, where various statistical and machine learning models were explored, using the Youth Risk Behavior Survey (YRBS) dataset from 2023. Through the course, and subsequently this notebook, I learned to implement and understand different modeling techniques, like lasso regression and random forest (as well as others), using the `tidymodel` framework in R.
